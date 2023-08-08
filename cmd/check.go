@@ -4,6 +4,7 @@ Copyright © 2023 Tobias Grotheer <tobias@grotheer-web.de>
 package cmd
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,9 +16,11 @@ import (
 )
 
 type Check struct {
-	url   string
-	key   string
-	regex string
+	url      string
+	key      string
+	regex    string
+	username string
+	password string
 }
 
 var check = Check{}
@@ -34,6 +37,8 @@ func init() {
 	checkCmd.Flags().StringVarP(&check.url, "url", "U", "", "The url to the endpoint, that should be checked")
 	checkCmd.Flags().StringVarP(&check.key, "key", "K", "", "The key to the json entry, that should be checked")
 	checkCmd.Flags().StringVarP(&check.regex, "regex", "R", "", "The regex to check the json value represented by the key")
+	checkCmd.Flags().StringVar(&check.username, "username", "", "Username for basic auth")
+	checkCmd.Flags().StringVar(&check.password, "password", "", "Password for basic auth")
 	rootCmd.AddCommand(checkCmd)
 }
 
@@ -43,13 +48,33 @@ func runCheck(cmd *cobra.Command, args []string) {
 }
 
 func (c Check) Execute() int {
-	//call the url
-	resp, err := http.Get(c.url)
+	//create request
+	req, err := http.NewRequest("GET", c.url, nil)
+	if err != nil {
+		fmt.Printf("CRITICAL - error while creating request to url: %s\n", err)
+		return 2
+	}
+
+	//create auth header, if username is set
+	if c.username != "" {
+		auth := base64.StdEncoding.EncodeToString([]byte(c.username + ":" + c.password))
+		req.Header.Add("Authorization", "Basic "+auth)
+	}
+
+	//do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("CRITICAL - error while calling the url: %s\n", err)
 		return 2
 	}
 	defer resp.Body.Close()
+
+	//check response code
+	if resp.StatusCode >= 299 {
+		fmt.Printf("UNKNOWN - response code was %d\n", resp.StatusCode)
+		return 3
+	}
 
 	//read the body as byte[]
 	body, err := io.ReadAll(resp.Body)
