@@ -5,7 +5,15 @@
 ### simple check without auth
 
 ```shell
-rest-api-cli check --url https://ipinfo.io/json --key country -w US -c DE
+rest-api-cli check --url https://ipinfo.io/json --key country --regex "^DE$" --severity crit
 ```
 
-This command requests the URL **https://ipinfo.io/json** and reads in the resulting key **country**. When the key is "US" we will get a warning and when we get the value "DE" we will get a critical. All other values will result in OK. When the key does not exist we will get UNKNOWN as result.
+This command requests the URL **https://ipinfo.io/json** and reads in the resulting key **country**. When the key is "DE" the return value will be OK. When the key has any other value it will return CRITICAL.
+
+### simple check with basic auth
+
+```shell
+rest-api-cli check --url https://ipinfo.io/json --key country --regex "^DE$" --severity warn --username monitor --password "123456"
+```
+
+This command is the same check, like the previous, but with username and password for basic authetification and the result is WARNING, when the key is not "OK".
