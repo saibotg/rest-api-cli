@@ -48,23 +48,28 @@ func init() {
 
 func runCheck(cmd *cobra.Command, args []string) {
 	result := check.Execute()
-	os.Exit(result)
+	fmt.Printf("%s - %s\n", result.ResultText(), result.InfoText)
+	os.Exit(int(result.ResultCode))
 }
 
-func (c Check) Execute() int {
+func (c Check) Execute() nagios.NagiosResult {
 	//create request
 	req, err := http.NewRequest("GET", c.url, nil)
 	if err != nil {
-		fmt.Printf("%s - error while creating request to url: %s\n", nagios.NagiosResultCriticalText, err)
-		return nagios.NagiosResultCriticalCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultCritical,
+			InfoText:   fmt.Sprintf("error while creating request to url: %s", err),
+		}
 	}
 
 	//create auth header, if username is set
 	if c.authFile != "" {
 		content, err := os.ReadFile(c.authFile)
 		if err != nil {
-			fmt.Printf("%s - error reading auth file %s\n", nagios.NagiosResultUnknownText, c.authFile)
-			return nagios.NagiosResultUnknownCode
+			return nagios.NagiosResult{
+				ResultCode: nagios.NagiosResultUnknown,
+				InfoText:   fmt.Sprintf("error reading auth file %s", c.authFile),
+			}
 		}
 		req.Header.Add("Authorization", strings.TrimSpace(string(content)))
 	} else if c.username != "" {
@@ -76,22 +81,28 @@ func (c Check) Execute() int {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("%s - error while calling the url: %s\n", nagios.NagiosResultCriticalText, err)
-		return nagios.NagiosResultCriticalCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultCritical,
+			InfoText:   fmt.Sprintf("error while calling the url: %s", err),
+		}
 	}
 	defer resp.Body.Close()
 
 	//check response code
 	if resp.StatusCode >= 299 {
-		fmt.Printf("%s - response code was %d\n", nagios.NagiosResultUnknownText, resp.StatusCode)
-		return nagios.NagiosResultUnknownCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultUnknown,
+			InfoText:   fmt.Sprintf("response code was %d", resp.StatusCode),
+		}
 	}
 
 	//read the body as byte[]
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("%s - Error reading body: %s\n", nagios.NagiosResultCriticalText, err)
-		return nagios.NagiosResultCriticalCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultCritical,
+			InfoText:   fmt.Sprintf("Error reading body: %s", err),
+		}
 	}
 
 	//parse the body as gjson
@@ -102,23 +113,31 @@ func (c Check) Execute() int {
 
 	//check if key exists
 	if !keyResult.Exists() {
-		fmt.Printf("%s - Key '%s' not found\n", nagios.NagiosResultUnknownText, c.key)
-		return nagios.NagiosResultUnknownCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultUnknown,
+			InfoText:   fmt.Sprintf("Key '%s' not found", c.key),
+		}
 	}
 
 	//check if regex is valid
 	re, err := regexp.Compile(c.regex)
 	if err != nil {
-		fmt.Printf("%s - Regex pattern is not valid\n", nagios.NagiosResultUnknownText)
-		return nagios.NagiosResultUnknownCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultUnknown,
+			InfoText:   "Regex pattern is not valid",
+		}
 	}
 
 	//check if value matches pattern
 	if re.MatchString(keyResult.String()) {
-		fmt.Printf("%s - Value '%s' matches the pattern\n", nagios.NagiosResultOkText, keyResult.String())
-		return nagios.NagiosResultOkCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultOk,
+			InfoText:   fmt.Sprintf("Value '%s' matches the pattern", keyResult.String()),
+		}
 	} else {
-		fmt.Printf("%s - Value '%s' does not match the pattern.\n", nagios.NagiosResultCriticalText, keyResult.String())
-		return nagios.NagiosResultCriticalCode
+		return nagios.NagiosResult{
+			ResultCode: nagios.NagiosResultCritical,
+			InfoText:   fmt.Sprintf("Value '%s' does not match the pattern", keyResult.String()),
+		}
 	}
 }
