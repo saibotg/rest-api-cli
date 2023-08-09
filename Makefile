@@ -1,7 +1,7 @@
 BINARY_NAME="rest-api-cli"
 BIN_DIR="bin"
 DIST_DIR="dist"
-VERSION="0.0.2"
+VERSION="0.0.3"
 
 .PHONY: clean test build package
 
