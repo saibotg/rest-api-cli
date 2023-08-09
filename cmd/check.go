@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/saibot/rest-api-cli/nagios"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
 )
@@ -51,8 +52,8 @@ func (c Check) Execute() int {
 	//create request
 	req, err := http.NewRequest("GET", c.url, nil)
 	if err != nil {
-		fmt.Printf("CRITICAL - error while creating request to url: %s\n", err)
-		return 2
+		fmt.Printf("%s - error while creating request to url: %s\n", nagios.NagiosResultCriticalText, err)
+		return nagios.NagiosResultCriticalCode
 	}
 
 	//create auth header, if username is set
@@ -65,22 +66,22 @@ func (c Check) Execute() int {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("CRITICAL - error while calling the url: %s\n", err)
-		return 2
+		fmt.Printf("%s - error while calling the url: %s\n", nagios.NagiosResultCriticalText, err)
+		return nagios.NagiosResultCriticalCode
 	}
 	defer resp.Body.Close()
 
 	//check response code
 	if resp.StatusCode >= 299 {
-		fmt.Printf("UNKNOWN - response code was %d\n", resp.StatusCode)
-		return 3
+		fmt.Printf("%s - response code was %d\n", nagios.NagiosResultUnknownText, resp.StatusCode)
+		return nagios.NagiosResultUnknownCode
 	}
 
 	//read the body as byte[]
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("CRITICAL - Error reading body: %s\n", err)
-		return 2
+		fmt.Printf("%s - Error reading body: %s\n", nagios.NagiosResultCriticalText, err)
+		return nagios.NagiosResultCriticalCode
 	}
 
 	//parse the body as gjson
@@ -91,23 +92,23 @@ func (c Check) Execute() int {
 
 	//check if key exists
 	if !keyResult.Exists() {
-		fmt.Printf("UNKNOWN - Key '%s' not found\n", c.key)
-		return 3
+		fmt.Printf("%s - Key '%s' not found\n", nagios.NagiosResultUnknownText, c.key)
+		return nagios.NagiosResultUnknownCode
 	}
 
 	//check if regex is valid
 	re, err := regexp.Compile(c.regex)
 	if err != nil {
-		fmt.Printf("UNKNOWN - Regex pattern is not valid\n")
-		return 3
+		fmt.Printf("%s - Regex pattern is not valid\n", nagios.NagiosResultUnknownText)
+		return nagios.NagiosResultUnknownCode
 	}
 
 	//check if value matches pattern
 	if re.MatchString(keyResult.String()) {
-		fmt.Printf("OK - Value '%s' matches the pattern\n", keyResult.String())
-		return 1
+		fmt.Printf("%s - Value '%s' matches the pattern\n", nagios.NagiosResultOkText, keyResult.String())
+		return nagios.NagiosResultOkCode
 	} else {
-		fmt.Printf("CRITICAL - Value '%s' does not match the pattern.\n", keyResult.String())
-		return 2
+		fmt.Printf("%s - Value '%s' does not match the pattern.\n", nagios.NagiosResultCriticalText, keyResult.String())
+		return nagios.NagiosResultCriticalCode
 	}
 }
