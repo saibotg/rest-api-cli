@@ -66,11 +66,9 @@ func (c Check) Execute() int {
 			fmt.Printf("%s - error reading auth file %s\n", nagios.NagiosResultUnknownText, c.authFile)
 			return nagios.NagiosResultUnknownCode
 		}
-		fmt.Printf("%s\n", strings.TrimSpace(string(content)))
 		req.Header.Add("Authorization", strings.TrimSpace(string(content)))
 	} else if c.username != "" {
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(c.username+":"+c.password))
-		fmt.Printf("%s\n", auth)
 		req.Header.Add("Authorization", auth)
 	}
 
