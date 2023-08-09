@@ -1,45 +1,36 @@
-XC_OS="linux darwin"
-XC_ARCH="amd64"
-XC_PARALLEL="2"
-BIN="bin"
-SRC=$(shell find . -name "*.go")
+BINARY_NAME="rest-api-cli"
+BIN_DIR="bin"
+DIST_DIR="dist"
+VERSION="0.0.2"
 
-ifeq (, $(shell which golangci-lint))
-$(warning "could not find golangci-lint in $(PATH), run: curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh")
-endif
+.PHONY: clean test build package
 
-ifeq (, $(shell which gox))
-$(warning "could not find gox in $(PATH), run: go install github.com/mitchellh/gox@latest")
-endif
+all: clean test build pack checksum
 
-default: all
+test:
+	$(info **** test ****)
+	go test ./...
 
-all: fmt test build
+build:
+	$(info **** build ****)
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -o $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_darwin-amd64/$(BINARY_NAME) main.go
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -o $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_linux-amd64/$(BINARY_NAME) main.go
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=windows go build -o $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_windows-amd64/$(BINARY_NAME).exe main.go
 
-build: install_deps
-	gox \
-		-os=$(XC_OS) \
-		-arch=$(XC_ARCH) \
-		-parallel=$(XC_PARALLEL) \
-		-output=$(BIN)/{{.Dir}}_{{.OS}}_{{.Arch}} \
-		;
+pack:
+	$(info **** create packages ****)
+	tar -czvf $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_darwin-amd64.tar.gz -C $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_darwin-amd64 .
+	tar -czvf $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_linux-amd64.tar.gz -C $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_linux-amd64 .
+	tar -czvf $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_windows-amd64.tar.gz -C $(BIN_DIR)/$(BINARY_NAME)_$(VERSION)_windows-amd64 .
 
-fmt:
-	$(info **** formatting ****)
-	@test -z $(shell gofmt -l $(SRC)) || (gofmt -d $(SRC); exit 1)
-
-lint:
-	$(info **** running lint tools ****)
-	golangci-lint run -v
-
-test: install_deps
-	$(info **** running tests ****)
-	go test -v ./...
-
-install_deps:
-	$(info **** downloading dependencies ****)
-	go get -v ./...
+checksum:
+	$(info **** create checksums ****)
+	sha256sum $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_darwin-amd64.tar.gz > $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_darwin-amd64.tar.gz.sha256.txt
+	sha256sum $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_linux-amd64.tar.gz > $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_linux-amd64.tar.gz.sha256.txt
+	sha256sum $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_windows-amd64.tar.gz > $(DIST_DIR)/$(BINARY_NAME)_$(VERSION)_windows-amd64.tar.gz.sha256.txt
 
 clean:
-	$(info **** cleanup ****)
-	rm -rf $(BIN)
+	$(info **** clean ****)
+	go clean
+	rm -rf $(BIN_DIR)/*
+	rm -rf $(DIST_DIR)/*
