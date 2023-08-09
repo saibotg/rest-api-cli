@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/saibot/rest-api-cli/nagios"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ type Check struct {
 	regex    string
 	username string
 	password string
+	authFile string
 }
 
 var check = Check{}
@@ -38,6 +40,7 @@ func init() {
 	checkCmd.Flags().StringVarP(&check.url, "url", "U", "", "The url to the endpoint, that should be checked")
 	checkCmd.Flags().StringVarP(&check.key, "key", "K", "", "The key to the json entry, that should be checked")
 	checkCmd.Flags().StringVarP(&check.regex, "regex", "R", "", "The regex to check the json value represented by the key")
+	checkCmd.Flags().StringVar(&check.authFile, "auth-file", "", "Path to file with auth settings")
 	checkCmd.Flags().StringVar(&check.username, "username", "", "Username for basic auth")
 	checkCmd.Flags().StringVar(&check.password, "password", "", "Password for basic auth")
 	rootCmd.AddCommand(checkCmd)
@@ -57,9 +60,18 @@ func (c Check) Execute() int {
 	}
 
 	//create auth header, if username is set
-	if c.username != "" {
-		auth := base64.StdEncoding.EncodeToString([]byte(c.username + ":" + c.password))
-		req.Header.Add("Authorization", "Basic "+auth)
+	if c.authFile != "" {
+		content, err := os.ReadFile(c.authFile)
+		if err != nil {
+			fmt.Printf("%s - error reading auth file %s\n", nagios.NagiosResultUnknownText, c.authFile)
+			return nagios.NagiosResultUnknownCode
+		}
+		fmt.Printf("%s\n", strings.TrimSpace(string(content)))
+		req.Header.Add("Authorization", strings.TrimSpace(string(content)))
+	} else if c.username != "" {
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(c.username+":"+c.password))
+		fmt.Printf("%s\n", auth)
+		req.Header.Add("Authorization", auth)
 	}
 
 	//do the request
